@@ -5,16 +5,15 @@ mod scanner;
 mod result;
 mod report;
 
-use cli::Cli;
-use scanner::scan_port;
-use ports::parse_ports;
-use target::parse_target;
-use report::{build_report, print_human_readable};
 use clap::Parser;
-
-
-use threadpool::ThreadPool;
 use std::sync::mpsc::channel;
+use threadpool::ThreadPool;
+
+use cli::Cli;
+use ports::parse_ports;
+use report::{build_report, print_human_readable};
+use scanner::scan_port;
+use target::parse_target;
 
 fn main() {
     // -----------------------------
@@ -45,34 +44,42 @@ fn main() {
             let port_list = parse_ports(&ports);
 
             // -----------------------------
-            // 4. Concurrent scanning (Phase 4)
+            // 4. Concurrent scanning
             // -----------------------------
-        let workers = 50;
-let pool = ThreadPool::new(workers);
-let (tx, rx) = channel();
+            let workers = 50;
+            let pool = ThreadPool::new(workers);
+            let (tx, rx) = channel();
 
-let mut all_results = Vec::new();
+            for ip in targets {
+                for port in port_list.clone() {
+                    let tx = tx.clone();
+                    let ip = ip.clone();
+                    let timeout = timeout;
 
-for ip in targets {
-    for port in port_list.clone() {
-        let tx = tx.clone();
-        let ip = ip.clone();
-        let timeout = timeout;
+                    pool.execute(move || {
+                        let ip_str = ip.to_string();
+                        let result = scan_port(&ip_str, port, timeout);
+                        tx.send(result).unwrap();
+                    });
+                }
+            }
 
-        pool.execute(move || {
-            let ip_str = ip.to_string();
-            let result = scan_port(&ip_str, port, timeout);
-            tx.send(result).unwrap();
-        });
-    }
-}
+            // Close sending side
+            drop(tx);
 
-drop(tx);
+            // -----------------------------
+            // 5. Collect results
+            // -----------------------------
+            let mut results = Vec::new();
+            for result in rx {
+                results.push(result);
+            }
 
-for result in rx {
-    all_results.push(result);
-}
-
+            // -----------------------------
+            // 6. Build & print report (Phase 5)
+            // -----------------------------
+            let report = build_report(results);
+            print_human_readable(&report);
         }
     }
 }
