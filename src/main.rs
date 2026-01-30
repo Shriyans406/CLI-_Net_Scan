@@ -3,15 +3,18 @@ mod target;
 mod ports;
 mod scanner;
 mod result;
+mod report;
 
 use cli::Cli;
 use scanner::scan_port;
 use ports::parse_ports;
 use target::parse_target;
+use report::{build_report, print_human_readable};
+use clap::Parser;
+
+
 use threadpool::ThreadPool;
 use std::sync::mpsc::channel;
-
-
 
 fn main() {
     // -----------------------------
@@ -42,33 +45,35 @@ fn main() {
             let port_list = parse_ports(&ports);
 
             // -----------------------------
-            // 4. Scan each IP and port
+            // 4. Concurrent scanning (Phase 4)
             // -----------------------------
-            let workers = 50; // concurrency limit
+        let workers = 50;
 let pool = ThreadPool::new(workers);
-
 let (tx, rx) = channel();
 
+let mut all_results = Vec::new();
+
 for ip in targets {
-    for port in &port_list {
+    for port in port_list.clone() {
         let tx = tx.clone();
         let ip = ip.clone();
         let timeout = timeout;
 
         pool.execute(move || {
-            let result = scan_port(&ip, *port, timeout);
+            let ip_str = ip.to_string();
+            let result = scan_port(&ip_str, port, timeout);
             tx.send(result).unwrap();
         });
     }
 }
 
-drop(tx); // VERY IMPORTANT
+drop(tx);
 
 for result in rx {
-    println!("{:?}", result);
+    all_results.push(result);
 }
 
-            }
         }
     }
 }
+
