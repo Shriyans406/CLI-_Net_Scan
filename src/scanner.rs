@@ -3,12 +3,18 @@ use std::time::Duration;
 
 use crate::result::{ScanResult, PortState};
 
-pub fn scan_port(ip: &str, port: u16, timeout_ms: u64) -> ScanResult {
-    // 🔴 FIX: remove CIDR if present (e.g. 127.0.0.1/32 → 127.0.0.1)
+pub fn scan_port(ip: &str,
+    port: u16,
+    timeout_ms: u64,
+    verbose: bool,) -> ScanResult {
+    // FIX: remove CIDR if present (e.g. 127.0.0.1/32 → 127.0.0.1)
     let clean_ip = ip.split('/').next().unwrap();
 
     let addr_str = format!("{}:{}", clean_ip, port);
+    if verbose {
     println!("[DEBUG] Trying {}", addr_str);
+}
+
 
     let socket_addr: SocketAddr = match addr_str.to_socket_addrs() {
         Ok(mut addrs) => match addrs.next() {

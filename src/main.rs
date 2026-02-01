@@ -26,6 +26,8 @@ fn main() {
             target,
             ports,
             timeout,
+            json,
+            verbose,
         } => {
             // -----------------------------
             // 2. Parse and validate target
@@ -58,7 +60,8 @@ fn main() {
 
                     pool.execute(move || {
                         let ip_str = ip.to_string();
-                        let result = scan_port(&ip_str, port, timeout);
+                        let result = scan_port(&ip_str, port, timeout, verbose);
+
                         tx.send(result).unwrap();
                     });
                 }
@@ -79,7 +82,13 @@ fn main() {
             // 6. Build & print report (Phase 5)
             // -----------------------------
             let report = build_report(results);
-            print_human_readable(&report);
+
+if json {
+    report::print_json(&report);
+} else {
+    print_human_readable(&report);
+}
+
         }
     }
 }

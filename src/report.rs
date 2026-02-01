@@ -1,4 +1,7 @@
 use crate::result::{ScanMap, ScanResult, PortState};
+use serde_json::json;
+
+
 
 pub fn build_report(results: Vec<ScanResult>) -> ScanMap {
     let mut map: ScanMap = ScanMap::new();
@@ -31,3 +34,28 @@ pub fn print_human_readable(report: &ScanMap) {
         println!();
     }
 }
+
+pub fn print_json(report: &ScanMap) {
+    let mut output = serde_json::Map::new();
+
+    for (ip, results) in report {
+        let open_ports: Vec<u16> = results
+            .iter()
+            .filter(|r| matches!(r.state, PortState::Open))
+            .map(|r| r.port)
+            .collect();
+
+        output.insert(
+            ip.clone(),
+            json!({
+                "open_ports": open_ports
+            }),
+        );
+    }
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output).unwrap()
+    );
+}
+
