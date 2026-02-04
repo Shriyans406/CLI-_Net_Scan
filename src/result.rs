@@ -4,7 +4,8 @@ use std::collections::HashMap;
 pub enum PortState {
     Open,
     Closed,
-    //Filtered,
+    //changes
+    Filtered,
 }
 
 #[derive(Debug, Clone)]

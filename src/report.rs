@@ -1,8 +1,6 @@
 use crate::result::{ScanMap, ScanResult, PortState};
 use serde_json::json;
 
-
-
 pub fn build_report(results: Vec<ScanResult>) -> ScanMap {
     let mut map: ScanMap = ScanMap::new();
 
@@ -25,10 +23,21 @@ pub fn print_human_readable(report: &ScanMap) {
             .map(|r| r.port)
             .collect();
 
-        if open_ports.is_empty() {
-            println!("  No open ports found");
+        let filtered_ports: Vec<u16> = results
+            .iter()
+            .filter(|r| matches!(r.state, PortState::Filtered))
+            .map(|r| r.port)
+            .collect();
+
+        if open_ports.is_empty() && filtered_ports.is_empty() {
+            println!("  No open or filtered ports found");
         } else {
-            println!("  Open ports: {:?}", open_ports);
+            if !open_ports.is_empty() {
+                println!("  Open ports: {:?}", open_ports);
+            }
+            if !filtered_ports.is_empty() {
+                println!("  Filtered ports: {:?}", filtered_ports);
+            }
         }
 
         println!();
@@ -45,10 +54,17 @@ pub fn print_json(report: &ScanMap) {
             .map(|r| r.port)
             .collect();
 
+        let filtered_ports: Vec<u16> = results
+            .iter()
+            .filter(|r| matches!(r.state, PortState::Filtered))
+            .map(|r| r.port)
+            .collect();
+
         output.insert(
             ip.clone(),
             json!({
-                "open_ports": open_ports
+                "open_ports": open_ports,
+                "filtered_ports": filtered_ports
             }),
         );
     }

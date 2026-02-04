@@ -1,5 +1,7 @@
 use std::net::{TcpStream, SocketAddr, ToSocketAddrs};
 use std::time::Duration;
+use std::io::ErrorKind;
+
 
 use crate::result::{ScanResult, PortState};
 
@@ -41,22 +43,37 @@ pub fn scan_port(ip: &str,
     let timeout = Duration::from_millis(timeout_ms);
 
     match TcpStream::connect_timeout(&socket_addr, timeout) {
-        Ok(_) => {
-            println!("[DEBUG] CONNECT SUCCESS {}", addr_str);
-            ScanResult {
-                ip: clean_ip.to_string(),
-                port,
-                state: PortState::Open,
-            }
+    Ok(_) => {
+        if verbose {
+            println!("[DEBUG] OPEN {}:{}", ip, port);
         }
-        Err(e) => {
-            println!("[DEBUG] CONNECT FAIL {} → {}", addr_str, e);
-            ScanResult {
-                ip: clean_ip.to_string(),
-                port,
-                state: PortState::Closed,
-            }
+        ScanResult {
+            ip: ip.to_string(),
+            port,
+            state: PortState::Open,
         }
     }
+
+    Err(e) => {
+        let state = match e.kind() {
+            ErrorKind::ConnectionRefused => PortState::Closed,
+            ErrorKind::TimedOut | ErrorKind::WouldBlock => PortState::Filtered,
+            _ => PortState::Closed,
+        };
+
+        if verbose {
+            println!(
+                "[DEBUG] {:?} {}:{} → {:?}",
+                state, ip, port, e.kind()
+            );
+        }
+
+        ScanResult {
+            ip: ip.to_string(),
+            port,
+            state,
+        }
+    }
+}
 }
 
