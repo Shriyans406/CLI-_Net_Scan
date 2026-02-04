@@ -4,8 +4,17 @@ use std::collections::HashMap;
 pub enum PortState {
     Open,
     Closed,
-    //changes
     Filtered,
+}
+
+impl PortState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PortState::Open => "open",
+            PortState::Closed => "closed",
+            PortState::Filtered => "filtered",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

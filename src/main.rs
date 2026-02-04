@@ -4,6 +4,7 @@ mod ports;
 mod scanner;
 mod result;
 mod report;
+mod stats;
 
 use clap::Parser;
 use std::sync::mpsc::channel;
@@ -11,9 +12,10 @@ use threadpool::ThreadPool;
 
 use cli::Cli;
 use ports::parse_ports;
-use report::{build_report, print_human_readable};
 use scanner::scan_port;
 use target::parse_target;
+use report::{build_report, print_human_readable};
+use stats::ScanStats;
 
 fn main() {
     // -----------------------------
@@ -30,7 +32,7 @@ fn main() {
             verbose,
         } => {
             // -----------------------------
-            // 2. Parse and validate target
+            // 2. Parse target
             // -----------------------------
             let targets = match parse_target(&target) {
                 Ok(t) => t,
@@ -59,36 +61,40 @@ fn main() {
                     let timeout = timeout;
 
                     pool.execute(move || {
-                        let ip_str = ip.to_string();
-                        let result = scan_port(&ip_str, port, timeout, verbose);
-
+                        let result = scan_port(&ip.to_string(), port, timeout, verbose);
                         tx.send(result).unwrap();
                     });
                 }
             }
 
-            // Close sending side
             drop(tx);
 
             // -----------------------------
             // 5. Collect results
             // -----------------------------
             let mut results = Vec::new();
-            for result in rx {
-                results.push(result);
+            for r in rx {
+                results.push(r);
             }
 
             // -----------------------------
-            // 6. Build & print report (Phase 5)
+            // 6. Build report
             // -----------------------------
             let report = build_report(results);
 
-if json {
-    report::print_json(&report);
-} else {
-    print_human_readable(&report);
-}
+            // -----------------------------
+            // 7. Build stats (Phase 9)
+            // -----------------------------
+            let stats = ScanStats::from_report(&report);
 
+            // -----------------------------
+            // 8. Output
+            // -----------------------------
+            if json {
+                report::print_json(&report, &stats);
+            } else {
+                print_human_readable(&report, &stats);
+            }
         }
     }
 }

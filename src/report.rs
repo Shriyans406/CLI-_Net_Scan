@@ -1,7 +1,10 @@
-use crate::result::{ScanMap, ScanResult, PortState};
+use crate::result::{ScanMap, PortState};
+use crate::stats::ScanStats;
 use serde_json::json;
+use std::fs::File;
+use std::io::Write;
 
-pub fn build_report(results: Vec<ScanResult>) -> ScanMap {
+pub fn build_report(results: Vec<crate::result::ScanResult>) -> ScanMap {
     let mut map: ScanMap = ScanMap::new();
 
     for result in results {
@@ -13,7 +16,9 @@ pub fn build_report(results: Vec<ScanResult>) -> ScanMap {
     map
 }
 
-pub fn print_human_readable(report: &ScanMap) {
+/* ---------- HUMAN READABLE ---------- */
+
+pub fn print_human_readable(report: &ScanMap, stats: &ScanStats) {
     for (ip, results) in report {
         println!("Host: {}", ip);
 
@@ -23,28 +28,21 @@ pub fn print_human_readable(report: &ScanMap) {
             .map(|r| r.port)
             .collect();
 
-        let filtered_ports: Vec<u16> = results
-            .iter()
-            .filter(|r| matches!(r.state, PortState::Filtered))
-            .map(|r| r.port)
-            .collect();
-
-        if open_ports.is_empty() && filtered_ports.is_empty() {
-            println!("  No open or filtered ports found");
+        if open_ports.is_empty() {
+            println!("  No open ports found");
         } else {
-            if !open_ports.is_empty() {
-                println!("  Open ports: {:?}", open_ports);
-            }
-            if !filtered_ports.is_empty() {
-                println!("  Filtered ports: {:?}", filtered_ports);
-            }
+            println!("  Open ports: {:?}", open_ports);
         }
 
         println!();
     }
+
+    print_stats(stats);
 }
 
-pub fn print_json(report: &ScanMap) {
+/* ---------- JSON ---------- */
+
+pub fn print_json(report: &ScanMap, stats: &ScanStats) -> String {
     let mut output = serde_json::Map::new();
 
     for (ip, results) in report {
@@ -54,24 +52,43 @@ pub fn print_json(report: &ScanMap) {
             .map(|r| r.port)
             .collect();
 
-        let filtered_ports: Vec<u16> = results
-            .iter()
-            .filter(|r| matches!(r.state, PortState::Filtered))
-            .map(|r| r.port)
-            .collect();
-
         output.insert(
             ip.clone(),
             json!({
-                "open_ports": open_ports,
-                "filtered_ports": filtered_ports
+                "open_ports": open_ports
             }),
         );
     }
 
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&output).unwrap()
-    );
+    json!({
+        "report": output,
+        "stats": {
+            "total_ports": stats.total,
+            "open": stats.open,
+            "closed": stats.closed,
+            "filtered": stats.filtered
+        }
+    })
+    .to_string()
+}
+
+/* ---------- FILE EXPORT ---------- */
+
+pub fn write_to_file(path: &str, content: &str) {
+    let mut file = File::create(path)
+        .expect("Failed to create output file");
+    file.write_all(content.as_bytes())
+        .expect("Failed to write output file");
+}
+
+/* ---------- STATS ---------- */
+
+fn print_stats(stats: &ScanStats) {
+    println!("Scan Summary");
+    println!("------------");
+    println!("Total ports scanned : {}", stats.total);
+    println!("Open                : {}", stats.open);
+    println!("Closed              : {}", stats.closed);
+    println!("Filtered            : {}", stats.filtered);
 }
 
